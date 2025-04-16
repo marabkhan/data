@@ -58,7 +58,7 @@
       padding: 10px;
       border-radius: 12px;
       box-shadow: inset 0 0 0 1px #e5e7eb;
-      text-align: center; /* for initial "Loading chart..." text */
+      text-align: center;
     }
     h2 {
       font-size: 1.5rem;
@@ -116,10 +116,10 @@
     <p style="text-align: center; font-size: 1.1rem; color: #4b5563; margin-bottom: 8px;">
       Max Maksutova, Mollie Schuma, Nicole Sellers, Sarah Wozniak · Team 8 · Spring 2025
     </p>
-    <p class="description" style="max-width: 750px; margin: 20px auto 40px; text-align: center;">
+    <p class="description" style="max-width:750px; margin: 20px auto 40px; text-align: center;">
       This dashboard visualizes how stock prices respond to tariff-related news events.
-      It displays the last 30 days of stock data with vertical news lines indicating when events occurred.
-      If a single stock is selected, hovering over a news line will show the news details and its impact (percentage change from the previous day).
+      It displays the last 30 days of stock data with vertical news lines.
+      Hover over a news line to see the corresponding article (with details and, if available, impact).
     </p>
     <div class="form-group">
       <select id="stockSelect">
@@ -143,10 +143,10 @@
   </div>
   
 <script>
-  // Array of valid stock symbols (for which JSON files are provided)
+  // Array of valid stock symbols for which JSON files exist.
   const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
-  // Called when the user clicks "Pull Data"
+  // When "Pull Data" is clicked, fetch stock and news data.
   async function pullData() {
     const symbol = document.getElementById("stockSelect").value;
     document.getElementById("chart").innerHTML = "Loading chart...";
@@ -163,28 +163,25 @@
       chartData.push({ symbol, ...data });
     }
     
-    // Fetch news articles from the local news.json file.
     const allNews = await fetchTariffNews();
     
-    // If no stock data is returned, display an error message.
     if (!chartData || chartData.length === 0 || chartData.every(item => item.dates.length === 0)) {
       document.getElementById("chart").innerHTML = "No stock data available for the selected symbol.";
       return;
     }
     
-    // Build the chart and update the UI.
     setChart(chartData, allNews);
     renderNews(allNews, chartData);
   }
 
-  // Load stock data from a local JSON file (e.g., "aapl.json")
+  // Load stock data from a local JSON file (e.g., "aapl.json").
   async function fetchStockData(symbol) {
     try {
       const jsonFileName = symbol.toLowerCase() + ".json";
       const res = await fetch(jsonFileName);
       const data = await res.json();
       const timeSeries = data["Time Series (Daily)"];
-      const sortedDates = Object.keys(timeSeries).sort();  // oldest to newest
+      const sortedDates = Object.keys(timeSeries).sort();  // oldest -> newest
       const dates = sortedDates.slice(-30);                // last 30 days only
       const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
       return { dates, prices };
@@ -200,7 +197,7 @@
     try {
       const res = await fetch("news.json");
       const data = await res.json();
-      return data; // data is an array of news objects
+      return data; 
     } catch (error) {
       console.error("Failed to load news JSON file", error);
       return [{
@@ -211,18 +208,17 @@
     }
   }
 
-  // Build and display the chart with Plotly.js.
-  // News events are shown as vertical lines across the chart.
-  // If only one stock is selected, calculate and display the day-to-day impact for news events.
+  // Build and display the chart.
+  // A vertical line is drawn for each news event.
+  // An accompanying scatter trace with markers (placed on the vertical line) is added so that hovering shows news info.
   function setChart(dataArray, allNews) {
-    // Grab and clear the chart container
     const chartEl = document.getElementById("chart");
-    chartEl.innerHTML = "";  // Clear out any previous "Loading chart..." text
+    chartEl.innerHTML = "";  // clear "Loading chart..."
 
-    // Determine the overall stock date range (last 30 days).
+    // Determine the overall date range (last 30 days) from stock data.
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
-      if (dates.length > 0) {
+      if (dates.length) {
         const dMin = new Date(dates[0]);
         const dMax = new Date(dates[dates.length - 1]);
         if (!minDate || dMin < minDate) minDate = dMin;
@@ -238,7 +234,7 @@
     const minDateStr = minDate.toISOString().split("T")[0];
     const maxDateStr = maxDate.toISOString().split("T")[0];
 
-    // Filter news articles to only those within the stock date range.
+    // Filter news events to those within the stock date range.
     const filteredNews = allNews.filter(article => {
       const newsDate = new Date(article.date);
       return newsDate >= minDate && newsDate <= maxDate;
@@ -253,8 +249,18 @@
       type: 'scatter'
     }));
 
-    // If only one stock is selected, store its data for impact calculations.
+    // For hover markers: 
+    // If only one stock is selected, use its price on the news date.
+    // Otherwise, calculate the midpoint of all stock prices.
     const stockData = (dataArray.length === 1) ? dataArray[0] : null;
+    let midY = null;
+    if (!stockData) {
+      let allPrices = [];
+      dataArray.forEach(item => { allPrices = allPrices.concat(item.prices); });
+      const yMin = Math.min(...allPrices);
+      const yMax = Math.max(...allPrices);
+      midY = (yMin + yMax) / 2;
+    }
 
     // Create vertical line shapes for each news event.
     const newsShapes = filteredNews.map(article => ({
@@ -268,13 +274,13 @@
       line: { color: 'red', width: 1, dash: 'dot' }
     }));
 
-    // Create an invisible scatter trace for hover info on news events.
-    // For single-stock mode, attempt to fetch the stock price for that date and compute impact.
+    // Build an array for news hover markers.
     const newsHoverData = filteredNews.map(article => {
       const articleDateStr = article.date;
-      let yVal = null;
+      let yVal = stockData ? null : midY;
       let impactText = "";
       if (stockData) {
+        // Attempt to find a matching date.
         const idx = stockData.dates.indexOf(articleDateStr);
         if (idx !== -1) {
           yVal = stockData.prices[idx];
@@ -283,6 +289,8 @@
             const impact = ((yVal - prev) / prev) * 100;
             impactText = `Impact: ${impact.toFixed(2)}%`;
           }
+        } else {
+          yVal = midY; // fallback if date not found in stock data
         }
       }
       return {
@@ -296,7 +304,8 @@
       x: newsHoverData.map(d => d.x),
       y: newsHoverData.map(d => d.y),
       mode: 'markers',
-      marker: { size: 0, opacity: 0 },
+      // Use a marker with a nearly transparent fill so it remains "on" the line.
+      marker: { size: 12, color: 'rgba(0,0,0,0.01)' },
       hoverinfo: 'text',
       text: newsHoverData.map(d => d.hoverText),
       name: 'News'
@@ -315,7 +324,7 @@
   function renderNews(allNews, dataArray) {
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
-      if (dates.length > 0) {
+      if (dates.length) {
         const dMin = new Date(dates[0]);
         const dMax = new Date(dates[dates.length - 1]);
         if (!minDate || dMin < minDate) minDate = dMin;
