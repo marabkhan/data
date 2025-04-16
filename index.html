@@ -118,8 +118,9 @@
     </p>
 
     <p class="description" style="max-width: 750px; margin: 20px auto 40px; text-align: center;">
-      This dashboard visualizes how stock prices respond to trade and tariff-related news events. By tracking key companies and overlaying relevant headlines, it helps reveal potential correlations between policy announcements and market movements.
-      Use the dropdown to select a stock and view the recent 30-day price trend with news events overlapped.
+      This dashboard visualizes how stock prices respond to trade and tariff-related news events.  
+      It shows the last 30 days of stock data with local news events overlapped on the chart.  
+      When you select a single stock, the chart also calculates the impact (percentage change from the previous day) on news days.
     </p>
 
     <div class="form-group">
@@ -147,10 +148,10 @@
   </div>
 
 <script>
-  // List of stock symbols matching the local JSON files
+  // List of stock symbols for local JSON data.
   const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
-  // Called when the user clicks the "Pull Data" button.
+  // Called when user clicks "Pull Data"
   async function pullData() {
     const symbol = document.getElementById("stockSelect").value;
     document.getElementById("chart").innerHTML = "Loading chart...";
@@ -158,7 +159,7 @@
 
     let chartData = [];
     if (symbol === "ALL") {
-      // For "ALL", fetch each stock’s data.
+      // If "ALL" selected, fetch data for each stock.
       for (const sym of stockList) {
         const data = await fetchStockData(sym);
         chartData.push({ symbol: sym, ...data });
@@ -168,25 +169,23 @@
       chartData.push({ symbol, ...data });
     }
 
-    // Fetch all news articles from the local news.json file.
+    // Fetch news articles from local JSON.
     const allNews = await fetchTariffNews();
-    // Build chart (this function filters news to include only those whose dates fall in the stock data's date range).
+    // Build the stock chart and overlay the news markers (with impact details).
     setChart(chartData, allNews);
     // Render the news list below the chart.
     renderNews(allNews, chartData);
   }
 
-  // Fetch stock data from a local JSON file (e.g., "aapl.json" for Apple) located in the same folder.
+  // Load stock data from a local JSON file (e.g., aapl.json for Apple)
   async function fetchStockData(symbol) {
     try {
-      const jsonFileName = symbol.toLowerCase() + ".json";
+      const jsonFileName = symbol.toLowerCase() + ".json";  // Assuming files are in same folder
       const res = await fetch(jsonFileName);
       const data = await res.json();
-
-      // Extract last 30 days from "Time Series (Daily)"
       const timeSeries = data["Time Series (Daily)"];
-      const sortedDates = Object.keys(timeSeries).sort(); // sorted oldest to newest
-      const dates = sortedDates.slice(-30); // only last 30 dates
+      const sortedDates = Object.keys(timeSeries).sort();  // oldest to newest
+      const dates = sortedDates.slice(-30);                // last 30 days only
       const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
       return { dates, prices };
     } catch (error) {
@@ -195,17 +194,17 @@
     }
   }
 
-  // Fetch news articles from a local JSON file (news.json)
+  // Load news data from a local JSON file (news.json)
   async function fetchTariffNews() {
     try {
       const res = await fetch("news.json");
       const data = await res.json();
-      // Return all articles; they will be filtered later based on date.
+      // Return articles without filtering here; filtering will occur based on date range.
       return data.articles;
     } catch (error) {
       console.error("Failed to load news JSON file", error);
       return [{
-        title: "Unable to fetch real news. Try again later.",
+        title: "Unable to fetch news. Try again later.",
         url: "#",
         publishedAt: new Date().toISOString(),
         source: { name: "Fallback" }
@@ -213,28 +212,29 @@
     }
   }
 
-  // Build and display the chart with Plotly.js and overlay news markers.
+  // Build and display the stock chart with Plotly.js, overlaying news markers.
+  // Also compute and display the "impact" (percentage change) on the days where news events occur.
   function setChart(dataArray, allNews) {
-    // 1. Determine the overall date range from stock data (assuming all stocks use last 30 days).
+    // Determine overall date range (should be the last 30 days)
     let minDate = null;
     let maxDate = null;
     dataArray.forEach(({ dates }) => {
       if (dates.length > 0) {
-        const itemMin = new Date(dates[0]);
-        const itemMax = new Date(dates[dates.length - 1]);
-        if (!minDate || itemMin < minDate) minDate = itemMin;
-        if (!maxDate || itemMax > maxDate) maxDate = itemMax;
+        const dMin = new Date(dates[0]);
+        const dMax = new Date(dates[dates.length - 1]);
+        if (!minDate || dMin < minDate) minDate = dMin;
+        if (!maxDate || dMax > maxDate) maxDate = dMax;
       }
     });
 
-    // 2. Filter news articles so that only those within the stock data date range (last 30 days) are used.
+    // Filter news: Only include articles published within the stock data date range.
     const filteredNews = allNews.filter(article => {
       const newsDate = new Date(article.publishedAt);
       return newsDate >= minDate && newsDate <= maxDate;
     });
 
-    // 3. Create stock traces for Plotly.
-    const traces = dataArray.map(({ symbol, dates, prices }) => ({
+    // Create traces for each stock (lines with markers).
+    const stockTraces = dataArray.map(({ symbol, dates, prices }) => ({
       x: dates,
       y: prices,
       mode: 'lines+markers',
@@ -242,50 +242,56 @@
       type: 'scatter'
     }));
 
-    // 4. For news markers:
-    // If only one stock is selected, try to assign a y-value (the stock price) for each news article.
-    let stockData = null;
-    if (dataArray.length === 1) {
-      stockData = dataArray[0];
-    }
+    // If only one stock is selected, assign that data to "stockData"
+    let stockData = (dataArray.length === 1) ? dataArray[0] : null;
+
+    // Create news markers.
+    // When one stock is selected, calculate the impact (percentage change from previous day) for matching dates.
     const newsMarkers = filteredNews.map(article => {
-      // Format published date as YYYY-MM-DD.
+      // Format the published date as YYYY-MM-DD.
       const articleDateStr = new Date(article.publishedAt).toISOString().split("T")[0];
-      let yVal = null;
-      // If only one stock is selected, attempt to find the matching stock price.
+      let yVal = null;   // This will hold the stock price on that date (if found)
+      let impactText = "";  // To store impact info
+      
+      // If we have stock data (one stock scenario), try to locate the matching date.
       if (stockData) {
-        const idx = stockData.dates.indexOf(articleDateStr);
-        if (idx !== -1) {
-          yVal = stockData.prices[idx];
+        const index = stockData.dates.indexOf(articleDateStr);
+        if (index !== -1) {
+          yVal = stockData.prices[index];
+          // If not the first day, calculate impact relative to previous day.
+          if (index > 0) {
+            const previousPrice = stockData.prices[index - 1];
+            const currentPrice = stockData.prices[index];
+            const impact = ((currentPrice - previousPrice) / previousPrice) * 100;
+            // Format the impact text with two decimal places.
+            impactText = `Impact: ${impact.toFixed(2)}%`;
+          }
         }
       }
+      
       return {
         x: [articleDateStr],
-        y: [yVal], // will appear at the corresponding stock price if found
+        y: [yVal],  // If a matching stock price was found, use it.
         mode: 'markers',
         name: 'News',
-        text: [`${article.title}<br>${new Date(article.publishedAt).toLocaleDateString()}`],
+        text: [`${article.title}<br>${new Date(article.publishedAt).toLocaleDateString()}<br>${impactText}`],
         marker: { size: 12, color: 'red', symbol: 'diamond' },
         type: 'scatter'
       };
     });
 
-    // 5. Plot using Plotly.
-    Plotly.newPlot("chart", [...traces, ...newsMarkers], {
+    // Plot stock price and news markers together.
+    Plotly.newPlot("chart", [...stockTraces, ...newsMarkers], {
       title: "Stock Price Over Time (Last 30 Days)",
-      xaxis: {
-        title: "Date",
-        type: "date"
-      },
+      xaxis: { title: "Date", type: "date" },
       yaxis: { title: "Price (USD)" },
       legend: { orientation: "h", y: -0.2 }
     });
   }
 
-  // Render the filtered news articles in the news list section.
-  // Here we also filter the news articles to show only those within the stock date range.
+  // Render the news articles that fall within the stock data's date range in the news list.
   function renderNews(allNews, dataArray) {
-    // Determine the date range from stock data.
+    // Determine stock date range.
     let minDate = null;
     let maxDate = null;
     dataArray.forEach(({ dates }) => {
@@ -309,6 +315,7 @@
       return;
     }
 
+    // Create a news entry for each filtered article.
     filteredNews.forEach(article => {
       const div = document.createElement("div");
       div.className = "news-item";
