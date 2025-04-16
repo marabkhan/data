@@ -143,30 +143,34 @@
   </div>
   
 <script>
-  // Define a palette of blues and purples.
+  // Define a cute color palette (pastel tones)
   const colorPalette = [
-    "#1E90FF", // DodgerBlue
-    "#6A5ACD", // SlateBlue
-    "#8A2BE2", // BlueViolet
-    "#4169E1", // RoyalBlue
-    "#9370DB", // MediumPurple
-    "#4B0082", // Indigo
-    "#4682B4"  // SteelBlue
+    "#FFB6C1",  // LightPink
+    "#ADD8E6",  // LightBlue
+    "#D8BFD8",  // Thistle
+    "#98FB98",  // PaleGreen
+    "#FFFFE0",  // LightYellow
+    "#F08080",  // LightCoral
+    "#E6E6FA"   // Lavender
   ];
-  
-  // Array of valid stock symbols (for which JSON files are provided)
-  const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
+
+  // An array of valid stock symbols for which JSON files exist.
+  // Ensure these files (e.g., "aapl.json", "amzn.json", etc.) are present and correctly formatted.
+  const validStockSymbols = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
   async function pullData() {
     const symbol = document.getElementById("stockSelect").value;
+    console.log("Selected symbol:", symbol);
     document.getElementById("chart").innerHTML = "Loading chart...";
     document.getElementById("newsList").innerHTML = "Loading news...";
     
     let chartData = [];
     if (symbol === "ALL") {
-      for (const sym of stockList) {
+      for (const sym of validStockSymbols) {
         const data = await fetchStockData(sym);
-        chartData.push({ symbol: sym, ...data });
+        if(data.dates.length > 0){
+          chartData.push({ symbol: sym, ...data });
+        }
       }
     } else {
       const data = await fetchStockData(symbol);
@@ -184,7 +188,7 @@
     renderNews(allNews, chartData);
   }
 
-  // Load stock data from a local JSON file (e.g. "aapl.json").
+  // Load stock data from a local JSON file (e.g., "aapl.json").
   async function fetchStockData(symbol) {
     try {
       const jsonFileName = symbol.toLowerCase() + ".json";
@@ -201,7 +205,7 @@
     }
   }
 
-  // Load news data from a local JSON file.
+  // Load news data from the local JSON file (news.json).
   // Expected format: an array of objects with keys "date", "title", and "description".
   async function fetchTariffNews() {
     try {
@@ -219,10 +223,10 @@
   }
 
   // Build and display the chart with Plotly.js.
-  // Vertical news lines are drawn, and an invisible scatter trace is added so that hovering over the line shows the news details.
+  // Draw vertical news lines and add an invisible scatter trace so that hovering over a line shows news info.
   function setChart(dataArray, allNews) {
     const chartEl = document.getElementById("chart");
-    chartEl.innerHTML = "";  // clear "Loading chart..."
+    chartEl.innerHTML = "";  // Clear "Loading chart..."
 
     // Determine overall stock date range.
     let minDate = null, maxDate = null;
@@ -243,13 +247,13 @@
     const minDateStr = minDate.toISOString().split("T")[0];
     const maxDateStr = maxDate.toISOString().split("T")[0];
 
-    // Filter news events to those within the stock data date range.
+    // Filter news events to only those within the date range.
     const filteredNews = allNews.filter(article => {
       const newsDate = new Date(article.date);
       return newsDate >= minDate && newsDate <= maxDate;
     });
 
-    // Build stock traces with colors from our palette.
+    // Build stock traces using the cute palette.
     const stockTraces = dataArray.map(({ symbol, dates, prices }, i) => ({
       x: dates,
       y: prices,
@@ -260,9 +264,9 @@
       marker: { color: colorPalette[i % colorPalette.length], size: 6 }
     }));
 
-    // For single-stock mode, store that data for impact calculations.
+    // For hover markers: if only one stock is selected, use its price on the news date;
+    // otherwise, use the midpoint of all stock prices.
     const stockData = (dataArray.length === 1) ? dataArray[0] : null;
-    // For multiple stocks, compute midpoint of all stock prices.
     let midY = null;
     if (!stockData) {
       let allPrices = [];
@@ -272,7 +276,7 @@
       midY = (yMin + yMax) / 2;
     }
     
-    // Create vertical line shapes for each news event, using a purple tone.
+    // Draw vertical news lines using a cute pastel purple (Plum/Orchid).
     const newsShapes = filteredNews.map(article => ({
       type: 'line',
       x0: article.date,
@@ -281,7 +285,7 @@
       y1: 1,
       xref: 'x',
       yref: 'paper',
-      line: { color: "#8A2BE2", width: 1, dash: 'dot' }
+      line: { color: "#DDA0DD", width: 1, dash: 'dot' }
     }));
 
     // Build an array for news hover markers.
@@ -313,7 +317,7 @@
       x: newsHoverData.map(d => d.x),
       y: newsHoverData.map(d => d.y),
       mode: 'markers',
-      marker: { size: 12, color: 'rgba(0,0,0,0.01)' }, // nearly invisible but hoverable
+      marker: { size: 12, color: 'rgba(0,0,0,0.01)' },  // nearly invisible marker for hover
       hoverinfo: 'text',
       text: newsHoverData.map(d => d.hoverText),
       name: 'News'
@@ -328,7 +332,7 @@
     });
   }
 
-  // Render a list of news articles (filtered to the stock date range) below the chart.
+  // Render a list of news articles (filtered to the last 30 days) below the chart.
   function renderNews(allNews, dataArray) {
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
