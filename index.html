@@ -58,6 +58,7 @@
       padding: 10px;
       border-radius: 12px;
       box-shadow: inset 0 0 0 1px #e5e7eb;
+      height: 500px;
     }
     h2 {
       font-size: 1.5rem;
@@ -112,17 +113,15 @@
     <h1 style="font-size: 2.75rem; text-align: center; margin-bottom: 10px; color: #2563eb;">
       Tariff News Impact Dashboard
     </h1>
-
     <p style="text-align: center; font-size: 1.1rem; color: #4b5563; margin-top: 0; margin-bottom: 8px;">
       Max Maksutova, Mollie Schuma, Nicole Sellers, Sarah Wozniak · Team 8 · Spring 2025
     </p>
-
     <p class="description" style="max-width: 750px; margin: 20px auto 40px; text-align: center;">
       This dashboard visualizes how stock prices respond to trade and tariff-related news events. By tracking key companies and overlaying relevant headlines,
       it helps reveal potential correlations between policy announcements and market movements. Use the dropdown to select a stock and view recent price trends
       alongside major news headlines.
     </p>
-
+    
     <div class="form-group">
       <select id="stockSelect">
         <option value="AAPL">Apple (AAPL)</option>
@@ -136,19 +135,19 @@
       </select>
       <button onclick="pullData()">Pull Data</button>
     </div>
-
-    <div id="chart" style="height: 500px;"></div>
-
+    
+    <div id="chart"></div>
+    
     <h2>Recent Tariff News</h2>
     <div id="newsList"></div>
-
+    
     <div class="footer">
       Dashboard powered by local JSON files | Designed by Max & Team
     </div>
   </div>
 
 <script>
-  // Updated list of stocks
+  // List of available stocks (ensure your local JSON files match these names in lowercase, e.g., aapl.json)
   const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
   async function pullData() {
@@ -167,22 +166,22 @@
       chartData.push({ symbol, ...data });
     }
 
-    // Fetch news from local JSON file
-    const news = await fetchTariffNews();
-    setChart(chartData, news);
-    renderNews(news);
+    // Fetch the news from local JSON file
+    const allNews = await fetchTariffNews();
+    // Pass both stock data and news to setChart which handles filtering
+    setChart(chartData, allNews);
+    renderNews(allNews, chartData);
   }
 
-  // Fetch stock data from a local JSON file (e.g., "aapl.json" for Apple)
+  // Load stock data from local JSON (e.g., aapl.json, amzn.json, etc.)
   async function fetchStockData(symbol) {
     try {
       const jsonFileName = symbol.toLowerCase() + ".json";
       const res = await fetch(jsonFileName);
       const data = await res.json();
-
       const timeSeries = data["Time Series (Daily)"];
-      const sortedDates = Object.keys(timeSeries).sort();
-      const dates = sortedDates.slice(-30);
+      const sortedDates = Object.keys(timeSeries).sort();  // sorted oldest to newest
+      const dates = sortedDates.slice(-30);                // last 30 days only
       const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
       return { dates, prices };
     } catch (error) {
@@ -191,14 +190,11 @@
     }
   }
 
-  // Fetch news articles from a local JSON file (e.g., "news.json")
+  // Load news data from a local JSON file (news.json)
   async function fetchTariffNews() {
     try {
-      // Fetch the local file news.json which must be in the same directory as index.html
       const res = await fetch("news.json");
       const data = await res.json();
-
-      // Check if the status is "ok" and articles exist
       if (data.status === "ok" && data.articles?.length > 0) {
         return data.articles.map(article => ({
           title: article.title,
@@ -208,7 +204,6 @@
           url: article.url
         }));
       }
-
       return [];
     } catch (error) {
       console.error("Failed to load news JSON file", error);
@@ -221,9 +216,26 @@
     }
   }
 
-  // Build and display the chart with Plotly.js
-  function setChart(dataArray, news) {
-    const traces = dataArray.map(({ symbol, dates, prices }) => ({
+  // Build and display the chart using Plotly
+  function setChart(stockDataArray, allNews) {
+    // Determine global min and max dates from the stock data (assumes all arrays use the same 30-day window)
+    let minDate = null, maxDate = null;
+    stockDataArray.forEach(({ dates }) => {
+      if (dates.length === 0) return;
+      const itemMinDate = new Date(dates[0]);
+      const itemMaxDate = new Date(dates[dates.length - 1]);
+      if (!minDate || itemMinDate < minDate) minDate = itemMinDate;
+      if (!maxDate || itemMaxDate > maxDate) maxDate = itemMaxDate;
+    });
+
+    // Filter news articles so only those within the stock date range remain
+    const filteredNews = allNews.filter(article => {
+      const newsDate = new Date(article.publishedAt);
+      return (minDate && maxDate && newsDate >= minDate && newsDate <= maxDate);
+    });
+
+    // Create traces for the stock data
+    const traces = stockDataArray.map(({ symbol, dates, prices }) => ({
       x: dates,
       y: prices,
       mode: 'lines+markers',
@@ -231,11 +243,12 @@
       type: 'scatter'
     }));
 
-    // Create markers for news events (displayed on the chart as red diamonds)
-    const newsMarkers = news.map(article => {
-      const date = new Date(article.publishedAt).toISOString().split("T")[0];
+    // Create markers for the filtered news articles (displayed as red diamonds)
+    const newsMarkers = filteredNews.map(article => {
+      // Convert the article date to YYYY-MM-DD format (matching the stock data dates)
+      const articleDate = new Date(article.publishedAt).toISOString().split("T")[0];
       return {
-        x: [date],
+        x: [articleDate],
         y: [null],
         mode: 'markers',
         name: 'News',
@@ -257,29 +270,45 @@
   }
 
   // Render the news articles in the news list section
-  function renderNews(news) {
+  // Optionally, you can also choose to render only the filtered news articles here using the stock data date range
+  function renderNews(allNews, stockDataArray) {
+    // Determine global min and max dates from the stock data for filtering
+    let minDate = null, maxDate = null;
+    stockDataArray.forEach(({ dates }) => {
+      if (dates.length === 0) return;
+      const itemMinDate = new Date(dates[0]);
+      const itemMaxDate = new Date(dates[dates.length - 1]);
+      if (!minDate || itemMinDate < minDate) minDate = itemMinDate;
+      if (!maxDate || itemMaxDate > maxDate) maxDate = itemMaxDate;
+    });
+
+    // Filter news articles to match the stock date window
+    const filteredNews = allNews.filter(article => {
+      const newsDate = new Date(article.publishedAt);
+      return (minDate && maxDate && newsDate >= minDate && newsDate <= maxDate);
+    });
+
     const newsContainer = document.getElementById("newsList");
     newsContainer.innerHTML = "";
 
-    if (!news.length) {
-      newsContainer.innerHTML = "<p>No relevant news found at this time.</p>";
+    if (filteredNews.length === 0) {
+      newsContainer.innerHTML = "<p>No relevant news found in the selected period.</p>";
       return;
     }
 
-    news.forEach(article => {
+    filteredNews.forEach(article => {
       const div = document.createElement("div");
       div.className = "news-item";
-      const date = new Date(article.publishedAt).toLocaleDateString();
+      const dateStr = new Date(article.publishedAt).toLocaleDateString();
 
       div.innerHTML = `
         <h3>${article.title}</h3>
-        <p><strong>${date}</strong> | ${article.source?.name || "Unknown Source"}</p>
+        <p><strong>${dateStr}</strong> | ${article.source?.name || "Unknown Source"}</p>
         <p>${article.description || ""}</p>
         <a href="${article.url}" target="_blank">Read full article</a>
       `;
       newsContainer.appendChild(div);
     });
-    
   }
 </script>
 </body>
