@@ -58,8 +58,7 @@
       padding: 10px;
       border-radius: 12px;
       box-shadow: inset 0 0 0 1px #e5e7eb;
-      /* Remove any previous content */
-      text-align: center;
+      text-align: center; /* for initial "Loading chart..." text */
     }
     h2 {
       font-size: 1.5rem;
@@ -178,7 +177,7 @@
     renderNews(allNews, chartData);
   }
 
-  // Load stock data from a local JSON file (e.g., aapl.json)
+  // Load stock data from a local JSON file (e.g., "aapl.json")
   async function fetchStockData(symbol) {
     try {
       const jsonFileName = symbol.toLowerCase() + ".json";
@@ -196,7 +195,7 @@
   }
 
   // Load news data from a local JSON file.
-  // Expected format: an array of objects with keys "date", "title", "description".
+  // Expected format: an array of objects with keys "date", "title", and "description".
   async function fetchTariffNews() {
     try {
       const res = await fetch("news.json");
@@ -216,6 +215,11 @@
   // News events are shown as vertical lines across the chart.
   // If only one stock is selected, calculate and display the day-to-day impact for news events.
   function setChart(dataArray, allNews) {
+    // Grab and clear the chart container
+    const chartEl = document.getElementById("chart");
+    chartEl.innerHTML = "";  // Clear out any previous "Loading chart..." text
+
+    // Determine the overall stock date range (last 30 days).
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
       if (dates.length > 0) {
@@ -227,7 +231,7 @@
     });
     
     if (!minDate || !maxDate) {
-      document.getElementById("chart").innerHTML = "Invalid stock data.";
+      chartEl.innerHTML = "Invalid stock data.";
       return;
     }
     
@@ -240,7 +244,7 @@
       return newsDate >= minDate && newsDate <= maxDate;
     });
 
-    // Stock traces (line + markers).
+    // Build stock traces.
     const stockTraces = dataArray.map(({ symbol, dates, prices }) => ({
       x: dates,
       y: prices,
