@@ -143,19 +143,17 @@
   </div>
   
 <script>
-  // Define a cute color palette (pastel tones)
+  // Define a cute pastel color palette with no greens.
   const colorPalette = [
     "#FFB6C1",  // LightPink
     "#ADD8E6",  // LightBlue
     "#D8BFD8",  // Thistle
-    "#98FB98",  // PaleGreen
+    "#E0BBE4",  // Pastel Violet (replacing green)
     "#FFFFE0",  // LightYellow
     "#F08080",  // LightCoral
     "#E6E6FA"   // Lavender
   ];
 
-  // An array of valid stock symbols for which JSON files exist.
-  // Ensure these files (e.g., "aapl.json", "amzn.json", etc.) are present and correctly formatted.
   const validStockSymbols = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
   async function pullData() {
@@ -188,7 +186,6 @@
     renderNews(allNews, chartData);
   }
 
-  // Load stock data from a local JSON file (e.g., "aapl.json").
   async function fetchStockData(symbol) {
     try {
       const jsonFileName = symbol.toLowerCase() + ".json";
@@ -205,8 +202,6 @@
     }
   }
 
-  // Load news data from the local JSON file (news.json).
-  // Expected format: an array of objects with keys "date", "title", and "description".
   async function fetchTariffNews() {
     try {
       const res = await fetch("news.json");
@@ -222,13 +217,10 @@
     }
   }
 
-  // Build and display the chart with Plotly.js.
-  // Draw vertical news lines and add an invisible scatter trace so that hovering over a line shows news info.
   function setChart(dataArray, allNews) {
     const chartEl = document.getElementById("chart");
-    chartEl.innerHTML = "";  // Clear "Loading chart..."
+    chartEl.innerHTML = "";  // Clear the "Loading chart..." text
 
-    // Determine overall stock date range.
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
       if (dates.length) {
@@ -247,13 +239,11 @@
     const minDateStr = minDate.toISOString().split("T")[0];
     const maxDateStr = maxDate.toISOString().split("T")[0];
 
-    // Filter news events to only those within the date range.
     const filteredNews = allNews.filter(article => {
       const newsDate = new Date(article.date);
       return newsDate >= minDate && newsDate <= maxDate;
     });
 
-    // Build stock traces using the cute palette.
     const stockTraces = dataArray.map(({ symbol, dates, prices }, i) => ({
       x: dates,
       y: prices,
@@ -264,8 +254,6 @@
       marker: { color: colorPalette[i % colorPalette.length], size: 6 }
     }));
 
-    // For hover markers: if only one stock is selected, use its price on the news date;
-    // otherwise, use the midpoint of all stock prices.
     const stockData = (dataArray.length === 1) ? dataArray[0] : null;
     let midY = null;
     if (!stockData) {
@@ -276,7 +264,6 @@
       midY = (yMin + yMax) / 2;
     }
     
-    // Draw vertical news lines using a cute pastel purple (Plum/Orchid).
     const newsShapes = filteredNews.map(article => ({
       type: 'line',
       x0: article.date,
@@ -288,7 +275,6 @@
       line: { color: "#DDA0DD", width: 1, dash: 'dot' }
     }));
 
-    // Build an array for news hover markers.
     const newsHoverData = filteredNews.map(article => {
       const articleDateStr = article.date;
       let yVal = stockData ? null : midY;
@@ -317,7 +303,7 @@
       x: newsHoverData.map(d => d.x),
       y: newsHoverData.map(d => d.y),
       mode: 'markers',
-      marker: { size: 12, color: 'rgba(0,0,0,0.01)' },  // nearly invisible marker for hover
+      marker: { size: 12, color: 'rgba(0,0,0,0.01)' },
       hoverinfo: 'text',
       text: newsHoverData.map(d => d.hoverText),
       name: 'News'
@@ -332,7 +318,6 @@
     });
   }
 
-  // Render a list of news articles (filtered to the last 30 days) below the chart.
   function renderNews(allNews, dataArray) {
     let minDate = null, maxDate = null;
     dataArray.forEach(({ dates }) => {
