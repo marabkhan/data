@@ -178,7 +178,7 @@
     try {
       // Assuming the JSON files are stored in a folder called "data" and named in lowercase (e.g., aapl.json)
       const jsonFileName = symbol.toLowerCase() + ".json";
-      const res = await fetch(`data/${jsonFileName}`);
+      const res = await fetch(jsonFileName); // or './' + jsonFileName
       const data = await res.json();
 
       // Extract the "Time Series (Daily)" information
