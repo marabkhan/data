@@ -2,231 +2,195 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>News Impact Dashboard</title>
-  <!-- Plotly for charting -->
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <title>Tariff News Timeline</title>
   <style>
+    /* Basic styling for the page */
     body {
       font-family: Arial, sans-serif;
-      background-color: #f8fafc;
+      background: #f4f4f4;
       margin: 0;
       padding: 20px;
-      color: #1f2937;
     }
-    h1, h2 {
+    
+    h1 {
       text-align: center;
-    }
-    .dashboard-container {
-      max-width: 1100px;
-      margin: 0 auto;
-      background-color: #ffffff;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.1);
-    }
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      margin: 20px 0;
-      flex-wrap: wrap;
-    }
-    .controls label {
-      font-weight: 600;
-    }
-    .controls input[type="range"] {
-      width: 220px;
-    }
-    #chart {
-      width: 100%;
-      height: 500px;
-    }
-    #newsList {
-      margin-top: 30px;
-    }
-    .news-item {
-      border-left: 4px solid #2563eb;
-      background-color: #f9fafb;
-      padding: 16px 20px;
       margin-bottom: 20px;
-      border-radius: 8px;
     }
-    .news-item h3 {
-      margin: 0;
-      font-size: 1.1rem;
-      color: #1e40af;
-    }
-    .news-item p {
-      margin: 5px 0;
-      font-size: 0.95rem;
-      color: #374151;
-    }
-    .news-item a {
-      color: #2563eb;
-      font-weight: 500;
-      text-decoration: none;
-    }
-    .news-item a:hover {
-      text-decoration: underline;
-    }
-    .footer {
+    
+    /* Container for the timeline and filter controls */
+    .controls {
       text-align: center;
-      margin-top: 40px;
-      font-size: 0.85rem;
-      color: #6b7280;
+      margin-bottom: 30px;
     }
-    /* Simple color coding for sentiment */
-    span.negative {
-      color: #dc2626; /* red */
-      font-weight: 600;
+    
+    /* Timeline container */
+    .timeline {
+      position: relative;
+      margin: 0 auto;
+      padding: 20px 0;
+      width: 600px;
     }
-    span.positive {
-      color: #16a34a; /* green */
-      font-weight: 600;
+    
+    /* The vertical line */
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 30px;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: #ccc;
+    }
+    
+    /* Each timeline item */
+    .timeline-item {
+      position: relative;
+      margin: 20px 0;
+      padding-left: 60px;
+      background: #fff;
+      padding: 10px 20px;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Circle marker for each item */
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 15px;
+      background: #fff;
+      border: 4px solid #FF5722;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+    }
+    
+    /* Article date, title, and description styling */
+    .date {
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .title {
+      font-size: 1.2em;
+      margin: 5px 0;
+    }
+    
+    .description {
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <div class="dashboard-container">
-    <h1>Stock & News Impact Dashboard</h1>
-    <p style="text-align:center; max-width: 800px; margin: 0 auto;">
-      Observe how recent news headlines might correlate with stock price movements. Use the slider to filter out lower-impact news events and focus on the stories most likely to move the market.
-    </p>
 
-    <!-- Controls -->
-    <div class="controls">
-      <label for="impactSlider">Impact Threshold:</label>
-      <input type="range" id="impactSlider" min="0" max="1" step="0.05" value="0.50" oninput="updateThreshold(this.value)">
-      <span id="impactValue">0.50</span>
-    </div>
+  <h1>Tariff News Timeline</h1>
 
-    <!-- Chart -->
-    <div id="chart">Loading chart...</div>
+  <div class="controls">
+    <label for="startDate">Start Date:</label>
+    <input type="date" id="startDate">
+    <label for="endDate">End Date:</label>
+    <input type="date" id="endDate">
+    <button id="filterBtn">Filter Articles</button>
+  </div>
 
-    <!-- News Section -->
-    <h2>Relevant News</h2>
-    <div id="newsList">Loading news...</div>
-    <div class="footer">
-      &copy; 2025 - Team 8
-    </div>
+  <div class="timeline" id="timeline">
+    <!-- Timeline items will be rendered here -->
   </div>
 
   <script>
-    let stockData = [];       // Will hold array of { date, close }
-    let newsData = [];        // Will hold array of { date, impact, sentiment, ... }
-    let currentThreshold = 0.50;  // Default threshold
-
-    document.addEventListener("DOMContentLoaded", async () => {
-      await loadData();
-      renderChartAndNews();
-    });
-
-    // Fetch data from local JSON
-    async function loadData() {
+    // Function to load the JSON data from the tariffs.json file
+    async function loadNews() {
       try {
-        // Load stock data
-        const stockRes = await fetch("stock.json");
-        const stockJson = await stockRes.json();
-        // We expect { symbol: "...", history: [ {date: "yyyy-mm-dd", close: number}, ... ] }
-        stockData = stockJson.history || [];
-
-        // Load news data
-        const newsRes = await fetch("news.json");
-        const newsJson = await newsRes.json();
-        // We expect { articles: [ { title, date, impact, sentiment, description, url }, ... ] }
-        newsData = newsJson.articles || [];
+        const response = await fetch('tariffs.json');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const newsData = await response.json();
+        return newsData;
       } catch (error) {
-        console.error("Error loading JSON data:", error);
+        console.error('Error loading news data:', error);
+        return [];
       }
     }
 
-    function renderChartAndNews() {
-      // 1) Filter news by the current threshold
-      const filteredNews = newsData.filter(item => item.impact >= currentThreshold);
-
-      // 2) Sort stock data by date (if needed) and prepare for Plotly
-      const sortedStock = [...stockData].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-      // 3) Build the Plotly trace for the stock price
-      const traceStock = {
-        x: sortedStock.map(d => d.date),
-        y: sortedStock.map(d => d.close),
-        mode: 'lines+markers',
-        name: 'Stock Price',
-        line: { color: '#2563eb' },
-        type: 'scatter'
-      };
-
-      // 4) Create markers for news (color-coded by sentiment)
-      const newsMarkers = filteredNews.map(article => {
-        // If "date" in news is "2025-07-15"
-        // We'll make an annotation/marker at that date, with y=null to produce a vertical marker
-        let markerColor = '#16a34a'; // green
-        if (article.sentiment === 'negative') {
-          markerColor = '#dc2626';   // red
-        }
-        return {
-          x: [article.date],
-          y: [null], // We'll let Plotly place it on the chart with null => scattered marker
-          mode: 'markers',
-          name: 'News',
-          text: [`${article.title}<br>${article.date}`],
-          marker: { size: 10, color: markerColor, symbol: 'diamond' },
-          type: 'scatter'
-        };
+    // Function to filter news by the provided date range
+    function filterNewsByDate(newsData, startDate, endDate) {
+      return newsData.filter(item => {
+        const itemDate = new Date(item.date);
+        return itemDate >= startDate && itemDate <= endDate;
       });
-
-      // 5) Plot the chart
-      const layout = {
-        title: `Stock Price with News Event Overlays`,
-        xaxis: { title: 'Date', type: 'date' },
-        yaxis: { title: 'Price (USD)' },
-        legend: { orientation: "h", y: -0.2 }
-      };
-      Plotly.newPlot('chart', [traceStock, ...newsMarkers], layout);
-
-      // 6) Render the news list
-      renderNewsList(filteredNews);
     }
 
-    function renderNewsList(newsArray) {
-      const newsContainer = document.getElementById("newsList");
-      newsContainer.innerHTML = "";
+    // Function to render the timeline items in the DOM
+    function renderTimeline(newsItems) {
+      const timelineContainer = document.getElementById('timeline');
+      timelineContainer.innerHTML = '';
 
-      if (newsArray.length === 0) {
-        newsContainer.innerHTML = "<p>No news events found above the current impact threshold.</p>";
+      if (newsItems.length === 0) {
+        timelineContainer.innerHTML = '<p style="text-align:center;">No articles found for this date range.</p>';
         return;
       }
 
-      // Sort news by date (descending) to show latest first, or ascending as you wish
-      const sortedNews = [...newsArray].sort((a, b) => new Date(a.date) - new Date(b.date));
+      newsItems.forEach(item => {
+        const timelineItem = document.createElement('div');
+        timelineItem.className = 'timeline-item';
 
-      sortedNews.forEach(article => {
-        const div = document.createElement("div");
-        div.className = "news-item";
-        
-        const sentimentClass = article.sentiment === 'negative' ? 'negative' : 'positive';
-        const dateStr = new Date(article.date).toLocaleDateString();
+        const dateEl = document.createElement('div');
+        dateEl.className = 'date';
+        dateEl.textContent = item.date;
 
-        div.innerHTML = `
-          <h3>
-            <span class="${sentimentClass}">${article.sentiment}</span>
-            &middot; ${article.title}
-          </h3>
-          <p><strong>${dateStr}</strong> | Impact: <strong>${(article.impact).toFixed(2)}</strong></p>
-          <p>${article.description || ""}</p>
-          <a href="${article.url}" target="_blank">Read full article</a>
-        `;
-        newsContainer.appendChild(div);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'title';
+        titleEl.textContent = item.title;
+
+        const descEl = document.createElement('div');
+        descEl.className = 'description';
+        descEl.textContent = item.description;
+
+        timelineItem.appendChild(dateEl);
+        timelineItem.appendChild(titleEl);
+        timelineItem.appendChild(descEl);
+
+        timelineContainer.appendChild(timelineItem);
       });
     }
 
-    // Slider input handler
-    function updateThreshold(val) {
-      currentThreshold = parseFloat(val);
-      document.getElementById("impactValue").textContent = val;
-      renderChartAndNews();
+    // Initialize the timeline on page load
+    async function init() {
+      const newsData = await loadNews();
+
+      // Automatically set the date pickers to cover the entire date range available in the data
+      if (newsData.length > 0) {
+        let dates = newsData.map(item => new Date(item.date));
+        let defaultStartDate = new Date(Math.min(...dates));
+        let defaultEndDate = new Date(Math.max(...dates));
+
+        document.getElementById('startDate').value = defaultStartDate.toISOString().split('T')[0];
+        document.getElementById('endDate').value = defaultEndDate.toISOString().split('T')[0];
+
+        // Render all news items by default
+        renderTimeline(newsData);
+      }
+
+      // Set up the filtering function when the button is clicked
+      document.getElementById('filterBtn').addEventListener('click', () => {
+        const startDateInput = document.getElementById('startDate').value;
+        const endDateInput = document.getElementById('endDate').value;
+
+        if (!startDateInput || !endDateInput) {
+          alert("Please select both start and end dates.");
+          return;
+        }
+
+        const startDate = new Date(startDateInput);
+        const endDate = new Date(endDateInput);
+        const filteredNews = filterNewsByDate(newsData, startDate, endDate);
+        renderTimeline(filteredNews);
+      });
     }
+
+    init();
   </script>
 </body>
 </html>
