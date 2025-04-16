@@ -15,7 +15,7 @@
     .container {
       max-width: 1000px;
       margin: auto;
-      background: #f3f4f6; /* light gray background */
+      background: #f3f4f6;
       padding: 40px;
       border-radius: 16px;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
@@ -143,12 +143,12 @@
     <div id="newsList"></div>
 
     <div class="footer">
-      Dashboard powered by local JSON files and NewsAPI | Designed by Max & Team
+      Dashboard powered by local JSON files | Designed by Max & Team
     </div>
   </div>
 
 <script>
-  // Update the list of stocks to match the new local JSON files
+  // Updated list of stocks
   const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
 
   async function pullData() {
@@ -167,23 +167,20 @@
       chartData.push({ symbol, ...data });
     }
 
-    // Fetch tariff news (kept unchanged)
+    // Fetch news from local JSON file
     const news = await fetchTariffNews();
     setChart(chartData, news);
     renderNews(news);
   }
 
-  // Modified fetchStockData that loads local JSON files
+  // Fetch stock data from a local JSON file (e.g., "aapl.json" for Apple)
   async function fetchStockData(symbol) {
     try {
-      // Assuming the JSON files are stored in a folder called "data" and named in lowercase (e.g., aapl.json)
       const jsonFileName = symbol.toLowerCase() + ".json";
-      const res = await fetch(jsonFileName); // or './' + jsonFileName
+      const res = await fetch(jsonFileName);
       const data = await res.json();
 
-      // Extract the "Time Series (Daily)" information
       const timeSeries = data["Time Series (Daily)"];
-      // Get sorted dates (oldest to newest) and then take the most recent 30 entries
       const sortedDates = Object.keys(timeSeries).sort();
       const dates = sortedDates.slice(-30);
       const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
@@ -194,64 +191,27 @@
     }
   }
 
-  // The fetchTariffNews function remains the same (or adjust similarly if you want to use a static JSON file)
+  // Fetch news articles from a local JSON file (e.g., "news.json")
   async function fetchTariffNews() {
     try {
-      const keywords = encodeURIComponent("tariff OR tariffs OR trade war OR import tax");
-      const today = new Date();
-      const past = new Date(today);
-      past.setDate(today.getDate() - 30);
-
-      const from = past.toISOString().split("T")[0];
-      const to = today.toISOString().split("T")[0];
-
-      const url = `https://newsdata.io/api/1/archive?apikey=pub_8077850f756c6213aadd895f0005d44255e05&q=${keywords}&language=en&from_date=${from}&to_date=${to}`;
-      const res = await fetch(url);
+      // Fetch the local file news.json which must be in the same directory as index.html
+      const res = await fetch("news.json");
       const data = await res.json();
 
-      if (data.status === "success" && data.results?.length > 0) {
-        return data.results.map(article => ({
+      // Check if the status is "ok" and articles exist
+      if (data.status === "ok" && data.articles?.length > 0) {
+        return data.articles.map(article => ({
           title: article.title,
-          publishedAt: article.pubDate,
+          publishedAt: article.publishedAt,
           description: article.description,
-          source: { name: article.source_id || "NewsData" },
-          url: article.link
+          source: { name: article.source?.name || "Unknown Source" },
+          url: article.url
         }));
       }
 
-      throw new Error("No articles found in NewsData.io");
+      return [];
     } catch (error) {
-      console.warn("NewsData.io failed, falling back to Yahoo...", error);
-      return scrapeYahooNews();
-    }
-  }
-
-  async function scrapeYahooNews() {
-    try {
-      const proxy = "https://cors-anywhere.herokuapp.com/";
-      const res = await fetch(`${proxy}https://finance.yahoo.com/news/search?p=tariff`);
-      const html = await res.text();
-
-      const matches = [...html.matchAll(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/g)];
-      const articles = [];
-
-      for (let i = 0; i < matches.length; i++) {
-        const link = matches[i][1];
-        const title = matches[i][2].replace(/<[^>]+>/g, "").trim();
-        if (link.includes("/news/") && title && !title.includes("Yahoo")) {
-          articles.push({
-            title,
-            url: `https://finance.yahoo.com${link}`,
-            publishedAt: new Date().toISOString(),
-            source: { name: "Yahoo Finance" }
-          });
-        }
-        if (articles.length >= 5) break;
-      }
-
-      return articles;
-    } catch (error) {
-      console.error("Scraping Yahoo News failed", error);
+      console.error("Failed to load news JSON file", error);
       return [{
         title: "Unable to fetch real news. Try again later.",
         url: "#",
@@ -261,7 +221,7 @@
     }
   }
 
-  // Function to render the chart using Plotly.js
+  // Build and display the chart with Plotly.js
   function setChart(dataArray, news) {
     const traces = dataArray.map(({ symbol, dates, prices }) => ({
       x: dates,
@@ -271,6 +231,7 @@
       type: 'scatter'
     }));
 
+    // Create markers for news events (displayed on the chart as red diamonds)
     const newsMarkers = news.map(article => {
       const date = new Date(article.publishedAt).toISOString().split("T")[0];
       return {
@@ -295,7 +256,7 @@
     });
   }
 
-  // Function to render the news articles
+  // Render the news articles in the news list section
   function renderNews(news) {
     const newsContainer = document.getElementById("newsList");
     newsContainer.innerHTML = "";
