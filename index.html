@@ -1,80 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Tariff News Impact Dashboard</title>
+  <meta charset="UTF-8">
+  <title>News Impact Dashboard</title>
+  <!-- Plotly for charting -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f1f5f9;
+      font-family: Arial, sans-serif;
+      background-color: #f8fafc;
       margin: 0;
-      padding: 30px;
+      padding: 20px;
       color: #1f2937;
     }
-    .container {
-      max-width: 1000px;
-      margin: auto;
-      background: #f3f4f6;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    h1, h2 {
+      text-align: center;
     }
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 0.5rem;
-      color: #111827;
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.1);
     }
-    p.description {
-      font-size: 1.1rem;
-      color: #4b5563;
-      margin-bottom: 30px;
-    }
-    .form-group {
+    .controls {
       display: flex;
+      align-items: center;
+      gap: 15px;
+      margin: 20px 0;
       flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 30px;
     }
-    select, button {
-      padding: 12px 14px;
-      font-size: 1rem;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-    }
-    button {
-      background-color: #2563eb;
-      color: white;
+    .controls label {
       font-weight: 600;
-      cursor: pointer;
-      transition: background-color 0.2s, transform 0.1s;
     }
-    button:hover {
-      background-color: #1d4ed8;
-      transform: translateY(-1px);
+    .controls input[type="range"] {
+      width: 220px;
     }
     #chart {
-      background-color: #fff;
-      padding: 10px;
-      border-radius: 12px;
-      box-shadow: inset 0 0 0 1px #e5e7eb;
+      width: 100%;
+      height: 500px;
     }
-    h2 {
-      font-size: 1.5rem;
-      margin-top: 40px;
-      margin-bottom: 20px;
-      color: #1f2937;
+    #newsList {
+      margin-top: 30px;
     }
     .news-item {
-      margin-bottom: 20px;
-      padding: 18px 20px;
       border-left: 4px solid #2563eb;
       background-color: #f9fafb;
-      border-radius: 10px;
-      transition: background-color 0.2s;
-    }
-    .news-item:hover {
-      background-color: #f3f4f6;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
     }
     .news-item h3 {
       margin: 0;
@@ -82,7 +57,7 @@
       color: #1e40af;
     }
     .news-item p {
-      margin: 6px 0;
+      margin: 5px 0;
       font-size: 0.95rem;
       color: #374151;
     }
@@ -95,233 +70,163 @@
       text-decoration: underline;
     }
     .footer {
-      margin-top: 60px;
-      font-size: 0.9rem;
-      color: #6b7280;
       text-align: center;
+      margin-top: 40px;
+      font-size: 0.85rem;
+      color: #6b7280;
     }
-    @media (max-width: 600px) {
-      .form-group {
-        flex-direction: column;
-      }
+    /* Simple color coding for sentiment */
+    span.negative {
+      color: #dc2626; /* red */
+      font-weight: 600;
+    }
+    span.positive {
+      color: #16a34a; /* green */
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1 style="font-size: 2.75rem; text-align: center; margin-bottom: 10px; color: #2563eb;">
-      Tariff News Impact Dashboard
-    </h1>
-
-    <p style="text-align: center; font-size: 1.1rem; color: #4b5563; margin-top: 0; margin-bottom: 8px;">
-      Max Maksutova, Mollie Schuma, Nicole Sellers, Sarah Wozniak · Team 8 · Spring 2025
+  <div class="dashboard-container">
+    <h1>Stock & News Impact Dashboard</h1>
+    <p style="text-align:center; max-width: 800px; margin: 0 auto;">
+      Observe how recent news headlines might correlate with stock price movements. Use the slider to filter out lower-impact news events and focus on the stories most likely to move the market.
     </p>
 
-    <p class="description" style="max-width: 750px; margin: 20px auto 40px; text-align: center;">
-      This dashboard visualizes how stock prices respond to trade and tariff-related news events. By tracking key companies and overlaying relevant headlines, it helps reveal potential correlations between policy announcements and market movements.
-      Use the dropdown to select a stock and view the recent 30-day price trend with news events overlapped.
-    </p>
-
-    <div class="form-group">
-      <select id="stockSelect">
-        <option value="AAPL">Apple (AAPL)</option>
-        <option value="AMZN">Amazon (AMZN)</option>
-        <option value="GOOGL">Google (GOOGL)</option>
-        <option value="META">Meta (META)</option>
-        <option value="MSFT">Microsoft (MSFT)</option>
-        <option value="NVDA">Nvidia (NVDA)</option>
-        <option value="TSLA">Tesla (TSLA)</option>
-        <option value="ALL">All Stocks Combined</option>
-      </select>
-      <button onclick="pullData()">Pull Data</button>
+    <!-- Controls -->
+    <div class="controls">
+      <label for="impactSlider">Impact Threshold:</label>
+      <input type="range" id="impactSlider" min="0" max="1" step="0.05" value="0.50" oninput="updateThreshold(this.value)">
+      <span id="impactValue">0.50</span>
     </div>
 
-    <div id="chart" style="height: 500px;"></div>
+    <!-- Chart -->
+    <div id="chart">Loading chart...</div>
 
-    <h2>Recent Tariff News (Last 30 Days)</h2>
-    <div id="newsList"></div>
-
+    <!-- News Section -->
+    <h2>Relevant News</h2>
+    <div id="newsList">Loading news...</div>
     <div class="footer">
-      Dashboard powered by local JSON files | Designed by Max & Team
+      &copy; 2025 - Team 8
     </div>
   </div>
 
-<script>
-  // List of stock symbols matching the local JSON files
-  const stockList = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 'NVDA', 'TSLA'];
+  <script>
+    let stockData = [];       // Will hold array of { date, close }
+    let newsData = [];        // Will hold array of { date, impact, sentiment, ... }
+    let currentThreshold = 0.50;  // Default threshold
 
-  // Called when the user clicks the "Pull Data" button.
-  async function pullData() {
-    const symbol = document.getElementById("stockSelect").value;
-    document.getElementById("chart").innerHTML = "Loading chart...";
-    document.getElementById("newsList").innerHTML = "Loading news...";
-
-    let chartData = [];
-    if (symbol === "ALL") {
-      // For "ALL", fetch each stock’s data.
-      for (const sym of stockList) {
-        const data = await fetchStockData(sym);
-        chartData.push({ symbol: sym, ...data });
-      }
-    } else {
-      const data = await fetchStockData(symbol);
-      chartData.push({ symbol, ...data });
-    }
-
-    // Fetch all news articles from the local news.json file.
-    const allNews = await fetchTariffNews();
-    // Build chart (this function filters news to include only those whose dates fall in the stock data's date range).
-    setChart(chartData, allNews);
-    // Render the news list below the chart.
-    renderNews(allNews, chartData);
-  }
-
-  // Fetch stock data from a local JSON file (e.g., "aapl.json" for Apple) located in the same folder.
-  async function fetchStockData(symbol) {
-    try {
-      const jsonFileName = symbol.toLowerCase() + ".json";
-      const res = await fetch(jsonFileName);
-      const data = await res.json();
-
-      // Extract last 30 days from "Time Series (Daily)"
-      const timeSeries = data["Time Series (Daily)"];
-      const sortedDates = Object.keys(timeSeries).sort(); // sorted oldest to newest
-      const dates = sortedDates.slice(-30); // only last 30 dates
-      const prices = dates.map(date => parseFloat(timeSeries[date]["4. close"]));
-      return { dates, prices };
-    } catch (error) {
-      console.error("Failed to load JSON file for " + symbol, error);
-      return { dates: [], prices: [] };
-    }
-  }
-
-  // Fetch news articles from a local JSON file (news.json)
-  async function fetchTariffNews() {
-    try {
-      const res = await fetch("news.json");
-      const data = await res.json();
-      // Return all articles; they will be filtered later based on date.
-      return data.articles;
-    } catch (error) {
-      console.error("Failed to load news JSON file", error);
-      return [{
-        title: "Unable to fetch real news. Try again later.",
-        url: "#",
-        publishedAt: new Date().toISOString(),
-        source: { name: "Fallback" }
-      }];
-    }
-  }
-
-  // Build and display the chart with Plotly.js and overlay news markers.
-  function setChart(dataArray, allNews) {
-    // 1. Determine the overall date range from stock data (assuming all stocks use last 30 days).
-    let minDate = null;
-    let maxDate = null;
-    dataArray.forEach(({ dates }) => {
-      if (dates.length > 0) {
-        const itemMin = new Date(dates[0]);
-        const itemMax = new Date(dates[dates.length - 1]);
-        if (!minDate || itemMin < minDate) minDate = itemMin;
-        if (!maxDate || itemMax > maxDate) maxDate = itemMax;
-      }
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadData();
+      renderChartAndNews();
     });
 
-    // 2. Filter news articles so that only those within the stock data date range (last 30 days) are used.
-    const filteredNews = allNews.filter(article => {
-      const newsDate = new Date(article.publishedAt);
-      return newsDate >= minDate && newsDate <= maxDate;
-    });
+    // Fetch data from local JSON
+    async function loadData() {
+      try {
+        // Load stock data
+        const stockRes = await fetch("stock.json");
+        const stockJson = await stockRes.json();
+        // We expect { symbol: "...", history: [ {date: "yyyy-mm-dd", close: number}, ... ] }
+        stockData = stockJson.history || [];
 
-    // 3. Create stock traces for Plotly.
-    const traces = dataArray.map(({ symbol, dates, prices }) => ({
-      x: dates,
-      y: prices,
-      mode: 'lines+markers',
-      name: symbol,
-      type: 'scatter'
-    }));
-
-    // 4. For news markers:
-    // If only one stock is selected, try to assign a y-value (the stock price) for each news article.
-    let stockData = null;
-    if (dataArray.length === 1) {
-      stockData = dataArray[0];
-    }
-    const newsMarkers = filteredNews.map(article => {
-      // Format published date as YYYY-MM-DD.
-      const articleDateStr = new Date(article.publishedAt).toISOString().split("T")[0];
-      let yVal = null;
-      // If only one stock is selected, attempt to find the matching stock price.
-      if (stockData) {
-        const idx = stockData.dates.indexOf(articleDateStr);
-        if (idx !== -1) {
-          yVal = stockData.prices[idx];
-        }
+        // Load news data
+        const newsRes = await fetch("news.json");
+        const newsJson = await newsRes.json();
+        // We expect { articles: [ { title, date, impact, sentiment, description, url }, ... ] }
+        newsData = newsJson.articles || [];
+      } catch (error) {
+        console.error("Error loading JSON data:", error);
       }
-      return {
-        x: [articleDateStr],
-        y: [yVal], // will appear at the corresponding stock price if found
-        mode: 'markers',
-        name: 'News',
-        text: [`${article.title}<br>${new Date(article.publishedAt).toLocaleDateString()}`],
-        marker: { size: 12, color: 'red', symbol: 'diamond' },
+    }
+
+    function renderChartAndNews() {
+      // 1) Filter news by the current threshold
+      const filteredNews = newsData.filter(item => item.impact >= currentThreshold);
+
+      // 2) Sort stock data by date (if needed) and prepare for Plotly
+      const sortedStock = [...stockData].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // 3) Build the Plotly trace for the stock price
+      const traceStock = {
+        x: sortedStock.map(d => d.date),
+        y: sortedStock.map(d => d.close),
+        mode: 'lines+markers',
+        name: 'Stock Price',
+        line: { color: '#2563eb' },
         type: 'scatter'
       };
-    });
 
-    // 5. Plot using Plotly.
-    Plotly.newPlot("chart", [...traces, ...newsMarkers], {
-      title: "Stock Price Over Time (Last 30 Days)",
-      xaxis: {
-        title: "Date",
-        type: "date"
-      },
-      yaxis: { title: "Price (USD)" },
-      legend: { orientation: "h", y: -0.2 }
-    });
-  }
+      // 4) Create markers for news (color-coded by sentiment)
+      const newsMarkers = filteredNews.map(article => {
+        // If "date" in news is "2025-07-15"
+        // We'll make an annotation/marker at that date, with y=null to produce a vertical marker
+        let markerColor = '#16a34a'; // green
+        if (article.sentiment === 'negative') {
+          markerColor = '#dc2626';   // red
+        }
+        return {
+          x: [article.date],
+          y: [null], // We'll let Plotly place it on the chart with null => scattered marker
+          mode: 'markers',
+          name: 'News',
+          text: [`${article.title}<br>${article.date}`],
+          marker: { size: 10, color: markerColor, symbol: 'diamond' },
+          type: 'scatter'
+        };
+      });
 
-  // Render the filtered news articles in the news list section.
-  // Here we also filter the news articles to show only those within the stock date range.
-  function renderNews(allNews, dataArray) {
-    // Determine the date range from stock data.
-    let minDate = null;
-    let maxDate = null;
-    dataArray.forEach(({ dates }) => {
-      if (dates.length > 0) {
-        const dMin = new Date(dates[0]);
-        const dMax = new Date(dates[dates.length - 1]);
-        if (!minDate || dMin < minDate) minDate = dMin;
-        if (!maxDate || dMax > maxDate) maxDate = dMax;
-      }
-    });
-    const filteredNews = allNews.filter(article => {
-      const newsDate = new Date(article.publishedAt);
-      return newsDate >= minDate && newsDate <= maxDate;
-    });
+      // 5) Plot the chart
+      const layout = {
+        title: `Stock Price with News Event Overlays`,
+        xaxis: { title: 'Date', type: 'date' },
+        yaxis: { title: 'Price (USD)' },
+        legend: { orientation: "h", y: -0.2 }
+      };
+      Plotly.newPlot('chart', [traceStock, ...newsMarkers], layout);
 
-    const newsContainer = document.getElementById("newsList");
-    newsContainer.innerHTML = "";
-
-    if (!filteredNews.length) {
-      newsContainer.innerHTML = "<p>No relevant news found in the last 30 days.</p>";
-      return;
+      // 6) Render the news list
+      renderNewsList(filteredNews);
     }
 
-    filteredNews.forEach(article => {
-      const div = document.createElement("div");
-      div.className = "news-item";
-      const dateStr = new Date(article.publishedAt).toLocaleDateString();
-      div.innerHTML = `
-        <h3>${article.title}</h3>
-        <p><strong>${dateStr}</strong> | ${article.source?.name || "Unknown Source"}</p>
-        <p>${article.description || ""}</p>
-        <a href="${article.url}" target="_blank">Read full article</a>
-      `;
-      newsContainer.appendChild(div);
-    });
-  }
-</script>
+    function renderNewsList(newsArray) {
+      const newsContainer = document.getElementById("newsList");
+      newsContainer.innerHTML = "";
+
+      if (newsArray.length === 0) {
+        newsContainer.innerHTML = "<p>No news events found above the current impact threshold.</p>";
+        return;
+      }
+
+      // Sort news by date (descending) to show latest first, or ascending as you wish
+      const sortedNews = [...newsArray].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      sortedNews.forEach(article => {
+        const div = document.createElement("div");
+        div.className = "news-item";
+        
+        const sentimentClass = article.sentiment === 'negative' ? 'negative' : 'positive';
+        const dateStr = new Date(article.date).toLocaleDateString();
+
+        div.innerHTML = `
+          <h3>
+            <span class="${sentimentClass}">${article.sentiment}</span>
+            &middot; ${article.title}
+          </h3>
+          <p><strong>${dateStr}</strong> | Impact: <strong>${(article.impact).toFixed(2)}</strong></p>
+          <p>${article.description || ""}</p>
+          <a href="${article.url}" target="_blank">Read full article</a>
+        `;
+        newsContainer.appendChild(div);
+      });
+    }
+
+    // Slider input handler
+    function updateThreshold(val) {
+      currentThreshold = parseFloat(val);
+      document.getElementById("impactValue").textContent = val;
+      renderChartAndNews();
+    }
+  </script>
 </body>
 </html>
